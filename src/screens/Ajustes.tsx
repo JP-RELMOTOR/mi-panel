@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { acciones, useApp } from '../store'
 import { Boton, Encabezado, Tarjeta } from '../ui'
 import { hayNube } from '../firebase'
+import { MODELO_DEFECTO, MODELOS } from '../lib/claude'
 
 export default function Ajustes() {
   const s = useApp()
@@ -57,6 +58,42 @@ export default function Ajustes() {
             Quitar API key
           </button>
         )}
+
+        {/* selector de modelo */}
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <h3 className="text-sm font-semibold text-slate-700">
+            Modelo que te responde
+          </h3>
+          <div className="mt-2 flex flex-col gap-2">
+            {MODELOS.map((m) => {
+              const activo = (s.config.modelo ?? MODELO_DEFECTO) === m.id
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => acciones.setModelo(m.id)}
+                  className={`rounded-xl border px-3 py-2.5 text-left ${
+                    activo
+                      ? 'border-sky-600 bg-sky-50 ring-1 ring-sky-200'
+                      : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <span className="flex items-center justify-between">
+                    <span className="font-medium text-slate-800">
+                      {m.nombre}
+                    </span>
+                    {activo && <span className="text-sky-700">✓</span>}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    {m.detalle}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Aplica al chat, al prediagnóstico y al informe del Resumen.
+          </p>
+        </div>
       </Tarjeta>
 
       <Tarjeta className="mt-4 p-4">

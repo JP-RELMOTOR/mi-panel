@@ -26,6 +26,12 @@ import {
 } from 'firebase/auth'
 import { auth, db, hayNube, RAIZ } from './firebase'
 import {
+  borrarArchivoLocal,
+  guardarArchivoLocal,
+  leerArchivoLocal,
+  listarArchivosLocales,
+} from './lib/archivosLocal'
+import {
   estadoVacio,
   type AppState,
   type Consulta,
@@ -153,6 +159,27 @@ function cloudAEstado(val: Record<string, unknown> | null): AppState {
 }
 
 let unsubData: Unsubscribe | null = null
+let archivosSincronizados = false
+
+// Documentos guardados sin nube (pendientes en IndexedDB) → subirlos al
+// conectar, con sus metadatos.
+async function sincronizarArchivosPendientes() {
+  if (!db || !authState.usuario) return
+  try {
+    const filas = await listarArchivosLocales()
+    for (const f of filas.filter((x) => x.pendiente)) {
+      await set(ref(db, `archivos/${f.id}`), { id: f.id, datos: f.datos })
+      setLocal((s) => ({
+        ...s,
+        documentos: { ...s.documentos, [f.id]: f.meta },
+      }))
+      cloudSet(`documentos/${f.id}`, f.meta)
+      await guardarArchivoLocal({ ...f, pendiente: false })
+    }
+  } catch (e) {
+    console.warn('sincronizarArchivos:', e)
+  }
+}
 
 function conectarDatos() {
   if (!db || unsubData) return
@@ -162,6 +189,10 @@ function conectarDatos() {
       estado = cloudAEstado(snap.val())
       guardarLocal(estado)
       setAuthState({ nubeLista: true, sinAcceso: false })
+      if (!archivosSincronizados) {
+        archivosSincronizados = true
+        sincronizarArchivosPendientes()
+      }
     },
     (err) => {
       // Cuenta autenticada pero sin permiso (reglas): pantalla "sin acceso"
@@ -174,6 +205,7 @@ function conectarDatos() {
 function desconectarDatos() {
   unsubData?.()
   unsubData = null
+  archivosSincronizados = false
   try {
     localStorage.removeItem(STORAGE_KEY)
   } catch {
@@ -320,30 +352,48 @@ export const acciones = {
   },
 
   // ----- documentos originales (PDF/foto) -----
-  // El archivo (dataURL base64) va a la rama separada `archivos/{id}` para
-  // que el onValue principal no lo descargue: se carga solo a pedido.
+  // El archivo (dataURL base64) vive en IndexedDB del dispositivo Y en la
+  // rama separada `archivos/{id}` de la nube (fuera del onValue principal,
+  // se descarga solo a pedido). Sin nube: queda local marcado pendiente y
+  // se sube solo al conectar.
   async subirDocumento(
     meta: Omit<Documento, 'id'>,
     dataUrl: string,
   ): Promise<Documento> {
-    if (!hayNube() || !db || !authState.usuario) {
-      throw new Error(
-        'Guardar documentos requiere la nube configurada (Firebase).',
-      )
-    }
     const id = nuevoId('doc')
     const doc: Documento = { ...meta, id }
-    // primero el archivo; si falla, no queda metadato huérfano
-    await set(ref(db, `archivos/${id}`), { id, datos: dataUrl })
+    const enNube = hayNube() && !!db && !!authState.usuario
+    if (enNube && db) {
+      // primero el archivo; si falla, no queda metadato huérfano
+      await set(ref(db, `archivos/${id}`), { id, datos: dataUrl })
+    }
+    await guardarArchivoLocal({
+      id,
+      meta: doc,
+      datos: dataUrl,
+      pendiente: !enNube,
+    })
     setLocal((s) => ({ ...s, documentos: { ...s.documentos, [id]: doc } }))
     cloudSet(`documentos/${id}`, doc)
     return doc
   },
 
   async cargarArchivo(id: string): Promise<string | null> {
+    // caché local primero (y única fuente en modo sin nube)
+    const local = await leerArchivoLocal(id).catch(() => undefined)
+    if (local) return local.datos
     if (!hayNube() || !db || !authState.usuario) return null
     const snap = await get(ref(db, `archivos/${id}`))
-    return (snap.val() as { datos?: string } | null)?.datos ?? null
+    const datos = (snap.val() as { datos?: string } | null)?.datos ?? null
+    if (datos) {
+      const meta = estado.documentos[id]
+      if (meta) {
+        guardarArchivoLocal({ id, meta, datos, pendiente: false }).catch(
+          () => {},
+        )
+      }
+    }
+    return datos
   },
 
   borrarDocumento(id: string) {
@@ -352,6 +402,7 @@ export const acciones = {
       delete documentos[id]
       return { ...s, documentos }
     })
+    borrarArchivoLocal(id).catch(() => {})
     cloudRemove(`documentos/${id}`)
     if (hayNube() && db && authState.usuario) {
       remove(ref(db, `archivos/${id}`)).catch((e) =>
@@ -368,6 +419,11 @@ export const acciones = {
   setApiKey(apiKey: string) {
     setLocal((s) => ({ ...s, config: { ...s.config, apiKey } }))
     cloudSet(`config/apiKey`, apiKey)
+  },
+
+  setModelo(modelo: string) {
+    setLocal((s) => ({ ...s, config: { ...s.config, modelo } }))
+    cloudSet(`config/modelo`, modelo)
   },
 
   nuevoIdPublico(prefijo: string) {

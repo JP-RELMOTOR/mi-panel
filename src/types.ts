@@ -147,6 +147,7 @@ export interface ConfigApp {
   esquemaVersion?: number
   ultimaImportacion?: string
   apiKey?: string
+  modelo?: string // modelo del Asistente (ver MODELOS en lib/claude.ts)
 }
 
 // ============ Estado global de la app ============

@@ -38,7 +38,11 @@ export default function Resumen({
     setError('')
     setRegenerando(true)
     try {
-      const nuevo = await generarInforme(s.config.apiKey, armarContexto(s))
+      const nuevo = await generarInforme(
+        s.config.apiKey,
+        armarContexto(s),
+        s.config.modelo,
+      )
       acciones.guardarInforme(nuevo)
     } catch (e) {
       console.warn(e)

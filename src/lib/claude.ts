@@ -5,7 +5,33 @@ import type { AccionInforme, AppState, Informe, MensajeChat } from '../types'
 import { serieDeAnalito } from './rangos'
 import { esDelMesActual, hoyISO, ultimosDias } from './fechas'
 
-export const MODELO = 'claude-opus-4-8'
+// Modelos disponibles para el Asistente (elegible en Ajustes)
+export const MODELOS = [
+  {
+    id: 'claude-opus-4-8',
+    nombre: 'Claude Opus 4.8',
+    detalle: 'El más capaz — mejor razonamiento clínico. ~US$0,05–0,10 por consulta.',
+  },
+  {
+    id: 'claude-sonnet-5',
+    nombre: 'Claude Sonnet 5',
+    detalle: 'Casi tan bueno, a menos de la mitad del costo. ~US$0,02–0,04 por consulta.',
+  },
+  {
+    id: 'claude-haiku-4-5',
+    nombre: 'Claude Haiku 4.5',
+    detalle: 'El más rápido y económico, para preguntas simples. ~US$0,01 por consulta.',
+  },
+] as const
+
+export const MODELO_DEFECTO = 'claude-opus-4-8'
+
+// Haiku 4.5 no soporta thinking adaptativo — se omite el parámetro
+function configThinking(modelo: string) {
+  return modelo === 'claude-haiku-4-5'
+    ? {}
+    : { thinking: { type: 'adaptive' as const } }
+}
 
 // Rol e instrucciones del asistente (principio rector de la app)
 const INSTRUCCIONES = `Eres el asistente de salud personal del propietario de esta app privada ("Mi Panel"). Tienes acceso a todos sus datos de salud (abajo, en JSON).
@@ -107,12 +133,13 @@ export async function consultar(
   contexto: string,
   mensajes: MensajeChat[],
   onTexto: (acumulado: string) => void,
+  modelo: string = MODELO_DEFECTO,
 ): Promise<string> {
   const c = cliente(apiKey)
   const stream = c.messages.stream({
-    model: MODELO,
+    model: modelo,
     max_tokens: 16000,
-    thinking: { type: 'adaptive' },
+    ...configThinking(modelo),
     system: [
       { type: 'text', text: INSTRUCCIONES },
       {
@@ -186,12 +213,13 @@ const PROMPT_INFORME = `Genera mi INFORME DE CABECERA para la pantalla principal
 export async function generarInforme(
   apiKey: string,
   contexto: string,
+  modelo: string = MODELO_DEFECTO,
 ): Promise<Informe> {
   const c = cliente(apiKey)
   const res = await c.messages.create({
-    model: MODELO,
+    model: modelo,
     max_tokens: 8192,
-    thinking: { type: 'adaptive' },
+    ...configThinking(modelo),
     system: [
       { type: 'text', text: INSTRUCCIONES },
       {

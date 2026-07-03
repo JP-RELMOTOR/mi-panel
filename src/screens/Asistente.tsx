@@ -48,7 +48,13 @@ export default function Asistente({ onIrAjustes }: { onIrAjustes: () => void }) 
 
     try {
       const contexto = armarContexto(s)
-      const respuesta = await consultar(apiKey, contexto, nuevos, setParcial)
+      const respuesta = await consultar(
+        apiKey,
+        contexto,
+        nuevos,
+        setParcial,
+        s.config.modelo,
+      )
       const conMsj: MensajeChat[] = [
         ...nuevos,
         { rol: 'assistant', texto: respuesta },

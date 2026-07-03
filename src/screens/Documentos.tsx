@@ -72,20 +72,12 @@ export default function Documentos() {
         subtitulo="Tus exámenes reales (PDF o foto), listos para mostrar al médico"
       />
 
-      {!hayNube() ? (
-        <Tarjeta className="p-5">
-          <p className="text-sm leading-relaxed text-slate-600">
-            ☁️ Los documentos se guardan en tu base protegida de Firebase, que
-            aún no está configurada. Cuando la actives (Ajustes → Conexión),
-            esta sección queda lista para subir tus PDFs y fotos.
-          </p>
-        </Tarjeta>
-      ) : (
-        <Tarjeta className="p-4">
+      <Tarjeta className="p-4">
           <h2 className="font-semibold text-slate-800">Subir documento</h2>
           <p className="mt-1 text-sm text-slate-500">
-            PDF o foto. Las fotos se comprimen solas; el archivo queda en tu
-            base privada y se descarga solo cuando lo abres.
+            {hayNube()
+              ? 'PDF o foto. Las fotos se comprimen solas; el archivo queda en tu base privada y se descarga solo cuando lo abres.'
+              : 'PDF o foto. Por ahora se guardan en este dispositivo; cuando actives la nube (Firebase) se subirán solos a tu base privada.'}
           </p>
           <div className="mt-3 flex flex-col gap-2">
             <select
@@ -126,12 +118,11 @@ export default function Documentos() {
               {error}
             </p>
           )}
-        </Tarjeta>
-      )}
+      </Tarjeta>
 
       {/* lista */}
       <div className="mt-4 flex flex-col gap-2">
-        {documentos.length === 0 && hayNube() && (
+        {documentos.length === 0 && (
           <p className="py-4 text-center text-sm text-slate-400">
             Aún no hay documentos guardados.
           </p>
@@ -208,6 +199,17 @@ function Visor({ doc, onCerrar }: { doc: Documento; onCerrar: () => void }) {
           {doc.nombre}
         </p>
         <div className="flex shrink-0 gap-2">
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-white/15 px-3 py-1.5 text-sm text-white"
+              title="Abrir en el visor del navegador (zoom y scroll completo)"
+            >
+              ↗ Abrir
+            </a>
+          )}
           {url && (
             <a
               href={url}
