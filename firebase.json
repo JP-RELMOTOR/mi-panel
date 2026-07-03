@@ -1,0 +1,5 @@
+{
+  "database": {
+    "rules": "privado/rules_deploy.json"
+  }
+}
