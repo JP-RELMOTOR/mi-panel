@@ -7,6 +7,7 @@
 // ============================================================
 import { useSyncExternalStore } from 'react'
 import {
+  get,
   onValue,
   ref,
   set,
@@ -28,6 +29,7 @@ import {
   estadoVacio,
   type AppState,
   type Consulta,
+  type Documento,
   type HabitoDia,
   type Lectura,
   type Medicamento,
@@ -143,6 +145,7 @@ function cloudAEstado(val: Record<string, unknown> | null): AppState {
     habitos: v['habitos'] ?? {},
     consultas: v['consultas'] ?? {},
     lecturas: v['lecturas'] ?? {},
+    documentos: v['documentos'] ?? {},
     config: v['config'] ?? {},
   }
 }
@@ -312,6 +315,47 @@ export const acciones = {
       return { ...s, lecturas }
     })
     cloudRemove(`lecturas/${id}`)
+  },
+
+  // ----- documentos originales (PDF/foto) -----
+  // El archivo (dataURL base64) va a la rama separada `archivos/{id}` para
+  // que el onValue principal no lo descargue: se carga solo a pedido.
+  async subirDocumento(
+    meta: Omit<Documento, 'id'>,
+    dataUrl: string,
+  ): Promise<Documento> {
+    if (!hayNube() || !db || !authState.usuario) {
+      throw new Error(
+        'Guardar documentos requiere la nube configurada (Firebase).',
+      )
+    }
+    const id = nuevoId('doc')
+    const doc: Documento = { ...meta, id }
+    // primero el archivo; si falla, no queda metadato huérfano
+    await set(ref(db, `archivos/${id}`), { id, datos: dataUrl })
+    setLocal((s) => ({ ...s, documentos: { ...s.documentos, [id]: doc } }))
+    cloudSet(`documentos/${id}`, doc)
+    return doc
+  },
+
+  async cargarArchivo(id: string): Promise<string | null> {
+    if (!hayNube() || !db || !authState.usuario) return null
+    const snap = await get(ref(db, `archivos/${id}`))
+    return (snap.val() as { datos?: string } | null)?.datos ?? null
+  },
+
+  borrarDocumento(id: string) {
+    setLocal((s) => {
+      const documentos = { ...s.documentos }
+      delete documentos[id]
+      return { ...s, documentos }
+    })
+    cloudRemove(`documentos/${id}`)
+    if (hayNube() && db && authState.usuario) {
+      remove(ref(db, `archivos/${id}`)).catch((e) =>
+        console.warn('borrarArchivo:', e),
+      )
+    }
   },
 
   setApiKey(apiKey: string) {

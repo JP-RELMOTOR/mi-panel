@@ -109,6 +109,17 @@ export interface Lectura {
   texto: string
 }
 
+// Metadatos de un documento original (PDF/foto de examen). El archivo en sí
+// (base64) vive en la rama separada `archivos/{id}` y se descarga a pedido.
+export interface Documento {
+  id: string
+  nombre: string
+  mime: string
+  tamano: number // caracteres del dataURL (aprox bytes)
+  fecha: string // ISO de subida
+  examenId?: string
+}
+
 export interface Perfil {
   nombre?: string
   nacimiento?: string
@@ -136,6 +147,7 @@ export interface AppState {
   habitos: Record<string, HabitoDia> // fecha → HabitoDia
   consultas: Record<string, Consulta>
   lecturas: Record<string, Lectura>
+  documentos: Record<string, Documento>
   config: ConfigApp
 }
 
@@ -153,6 +165,7 @@ export function estadoVacio(): AppState {
     habitos: {},
     consultas: {},
     lecturas: {},
+    documentos: {},
     config: {},
   }
 }

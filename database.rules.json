@@ -17,8 +17,14 @@
       "habitos": { "$fecha": { ".validate": true } },
       "consultas": { "$id": { ".validate": "newData.hasChildren(['id','fecha'])" } },
       "lecturas": { "$id": { ".validate": "newData.hasChildren(['id','fecha'])" } },
+      "documentos": { "$id": { ".validate": "newData.hasChildren(['id','nombre'])" } },
       "config": { ".validate": true },
       "$otro": { ".validate": false }
+    },
+    "archivos": {
+      ".read": "auth != null && auth.uid === 'PEGAR_UID'",
+      ".write": "auth != null && auth.uid === 'PEGAR_UID'",
+      "$id": { ".validate": "newData.hasChildren(['id','datos'])" }
     }
   }
 }

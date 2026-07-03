@@ -10,6 +10,7 @@ import Tendencias from './screens/Tendencias'
 import Prevencion from './screens/Prevencion'
 import Diario from './screens/Diario'
 import Medicamentos from './screens/Medicamentos'
+import Documentos from './screens/Documentos'
 import Importar from './screens/Importar'
 import Ajustes from './screens/Ajustes'
 import Asistente from './screens/Asistente'
@@ -22,6 +23,7 @@ type Pantalla =
   | 'diario'
   | 'asistente'
   | 'medicamentos'
+  | 'documentos'
   | 'importar'
   | 'ajustes'
 
@@ -76,11 +78,14 @@ export default function App() {
       {/* contenido */}
       <main className="min-h-0 flex-1 overflow-y-auto">
         {pantalla === 'resumen' && <Resumen onIr={(p) => setPantalla(p)} />}
-        {pantalla === 'examenes' && <Examenes />}
+        {pantalla === 'examenes' && (
+          <Examenes onIrDocumentos={() => setPantalla('documentos')} />
+        )}
         {pantalla === 'tendencias' && <Tendencias />}
         {pantalla === 'prevencion' && <Prevencion />}
         {pantalla === 'diario' && <Diario />}
         {pantalla === 'medicamentos' && <Medicamentos />}
+        {pantalla === 'documentos' && <Documentos />}
         {pantalla === 'importar' && <Importar />}
         {pantalla === 'ajustes' && <Ajustes />}
         {pantalla === 'asistente' && (

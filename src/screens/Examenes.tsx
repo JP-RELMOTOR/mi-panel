@@ -16,14 +16,19 @@ import type { Examen } from '../types'
 
 type Filtro = 'todo' | 'fuera' | 'cambios'
 
-export default function Examenes() {
+export default function Examenes({
+  onIrDocumentos,
+}: {
+  onIrDocumentos: () => void
+}) {
   const s = useApp()
   const [filtro, setFiltro] = useState<Filtro>('todo')
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>({})
 
+  // Cronológico: desde el más antiguo (2020) hasta el más reciente
   const examenes = useMemo(
     () =>
-      Object.values(s.examenes).sort((a, b) => b.fecha.localeCompare(a.fecha)),
+      Object.values(s.examenes).sort((a, b) => a.fecha.localeCompare(b.fecha)),
     [s.examenes],
   )
 
@@ -74,11 +79,21 @@ export default function Examenes() {
         subtitulo={`${examenes.length} exámenes registrados`}
       />
 
-      {/* lista de exámenes */}
+      {/* lista de exámenes (cronológica) */}
       <div className="flex flex-col gap-2">
-        {examenes.map((ex) => (
-          <FilaExamen key={ex.id} ex={ex} />
-        ))}
+        {examenes.map((ex) => {
+          const nDocs = Object.values(s.documentos).filter(
+            (d) => d.examenId === ex.id,
+          ).length
+          return (
+            <FilaExamen
+              key={ex.id}
+              ex={ex}
+              nDocs={nDocs}
+              onVerDocs={onIrDocumentos}
+            />
+          )
+        })}
       </div>
 
       {/* filtros estilo dashboard */}
@@ -158,7 +173,15 @@ export default function Examenes() {
   )
 }
 
-function FilaExamen({ ex }: { ex: Examen }) {
+function FilaExamen({
+  ex,
+  nDocs,
+  onVerDocs,
+}: {
+  ex: Examen
+  nDocs: number
+  onVerDocs: () => void
+}) {
   const iconos: Record<string, string> = {
     laboratorio: '🧪',
     audiometria: '👂',
@@ -175,6 +198,15 @@ function FilaExamen({ ex }: { ex: Examen }) {
           {ex.nota ? ` · ${ex.nota}` : ''}
         </p>
       </div>
+      {nDocs > 0 && (
+        <button
+          onClick={onVerDocs}
+          className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700"
+          title="Ver documentos originales"
+        >
+          📎 {nDocs}
+        </button>
+      )}
     </Tarjeta>
   )
 }
