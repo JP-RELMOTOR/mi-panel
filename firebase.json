@@ -1,5 +1,9 @@
 {
   "database": {
     "rules": "privado/rules_deploy.json"
+  },
+  "hosting": {
+    "public": "dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
   }
 }
