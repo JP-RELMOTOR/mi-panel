@@ -1,0 +1,24 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "salud": {
+      ".read": "auth != null && auth.uid === 'PEGAR_UID'",
+      ".write": "auth != null && auth.uid === 'PEGAR_UID'",
+      "perfil": { ".validate": true },
+      "grupos": { "$id": { ".validate": "newData.hasChildren(['id','nombre'])" } },
+      "analitos": { "$id": { ".validate": "newData.hasChildren(['id','nombre','grupo'])" } },
+      "examenes": { "$id": { ".validate": "newData.hasChildren(['id','fecha'])" } },
+      "resultados": { "$analito": { "$examen": { ".validate": "newData.hasChildren(['estado'])" } } },
+      "tamizajes": { "$id": { ".validate": "newData.hasChildren(['id','nombre','estado'])" } },
+      "eventos": { "$id": { ".validate": "newData.hasChildren(['id','titulo'])" } },
+      "medicamentos": { "$id": { ".validate": "newData.hasChildren(['id','nombre'])" } },
+      "tomas": { "$med": { "$fecha": { ".validate": "newData.hasChildren(['fecha'])" } } },
+      "habitos": { "$fecha": { ".validate": true } },
+      "consultas": { "$id": { ".validate": "newData.hasChildren(['id','fecha'])" } },
+      "lecturas": { "$id": { ".validate": "newData.hasChildren(['id','fecha'])" } },
+      "config": { ".validate": true },
+      "$otro": { ".validate": false }
+    }
+  }
+}

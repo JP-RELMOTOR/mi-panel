@@ -1,0 +1,20 @@
+# Dependencias y build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# ── MATERIAL PERSONAL — NUNCA COMMITEAR ──────────────────────
+# Todo el material de salud vive en privado/ y queda fuera del repo.
+privado/
+files/
+Examenes/
+Mirror*
+*.zip
+*.pdf
+datos_semilla*.json
+
+# Sistema
+.DS_Store
+.env
+.env.*
+.claude/settings.local.json
