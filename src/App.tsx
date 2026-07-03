@@ -36,7 +36,7 @@ const TABS: { id: Pantalla; icono: string; label: string }[] = [
 ]
 
 export default function App() {
-  const { usuario, authListo, sinAcceso, nubeLista } = useAuth()
+  const { usuario, authListo, sinAcceso, nubeLista, esDueno } = useAuth()
   const [pantalla, setPantalla] = useState<Pantalla>('resumen')
 
   // ---- candado de acceso (solo con nube configurada) ----
@@ -60,20 +60,29 @@ export default function App() {
           Mi Panel
         </button>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setPantalla('asistente')}
-            className={`flex h-9 w-9 items-center justify-center rounded-full text-lg ${
-              pantalla === 'asistente'
-                ? 'bg-sky-100 text-sky-700'
-                : 'bg-slate-100'
-            }`}
-            title="Asistente"
-          >
-            💬
-          </button>
-          <MenuUsuario onIr={(p) => setPantalla(p)} />
+          {esDueno && (
+            <button
+              onClick={() => setPantalla('asistente')}
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-lg ${
+                pantalla === 'asistente'
+                  ? 'bg-sky-100 text-sky-700'
+                  : 'bg-slate-100'
+              }`}
+              title="Asistente"
+            >
+              💬
+            </button>
+          )}
+          <MenuUsuario esDueno={esDueno} onIr={(p) => setPantalla(p)} />
         </div>
       </header>
+
+      {!esDueno && (
+        <div className="no-print bg-amber-50 px-4 py-2 text-center text-xs text-amber-800">
+          👁 Modo lectura — puedes ver todo, pero no editar ni usar el
+          asistente.
+        </div>
+      )}
 
       {/* contenido */}
       <main className="min-h-0 flex-1 overflow-y-auto">
@@ -86,9 +95,9 @@ export default function App() {
         {pantalla === 'diario' && <Diario />}
         {pantalla === 'medicamentos' && <Medicamentos />}
         {pantalla === 'documentos' && <Documentos />}
-        {pantalla === 'importar' && <Importar />}
+        {pantalla === 'importar' && esDueno && <Importar />}
         {pantalla === 'ajustes' && <Ajustes />}
-        {pantalla === 'asistente' && (
+        {pantalla === 'asistente' && esDueno && (
           <Asistente onIrAjustes={() => setPantalla('ajustes')} />
         )}
       </main>

@@ -4,8 +4,10 @@ import { hayNube } from '../firebase'
 
 export default function MenuUsuario({
   onIr,
+  esDueno,
 }: {
   onIr: (p: 'medicamentos' | 'documentos' | 'importar' | 'ajustes') => void
+  esDueno: boolean
 }) {
   const { usuario } = useAuth()
   const [abierto, setAbierto] = useState(false)
@@ -77,9 +79,11 @@ export default function MenuUsuario({
             <MenuItem onClick={() => ir('documentos')}>
               📂 Documentos (PDF/fotos)
             </MenuItem>
-            <MenuItem onClick={() => ir('importar')}>
-              📥 Importar / Exportar
-            </MenuItem>
+            {esDueno && (
+              <MenuItem onClick={() => ir('importar')}>
+                📥 Importar / Exportar
+              </MenuItem>
+            )}
             <MenuItem onClick={() => ir('ajustes')}>⚙️ Ajustes</MenuItem>
 
             {hayNube() && usuario && (

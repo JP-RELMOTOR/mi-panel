@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { acciones, useApp } from '../store'
+import { acciones, useApp, useAuth } from '../store'
 import { hayNube } from '../firebase'
 import { Boton, Encabezado, Etiqueta, Tarjeta } from '../ui'
 import { fechaCorta } from '../lib/fechas'
@@ -9,6 +9,7 @@ const LIMITE_DATAURL = 7_000_000 // ~7 MB por archivo (RTDB aguanta de sobra)
 
 export default function Documentos() {
   const s = useApp()
+  const { esDueno } = useAuth()
   const [examenSel, setExamenSel] = useState('')
   const [subiendo, setSubiendo] = useState(false)
   const [error, setError] = useState('')
@@ -72,6 +73,7 @@ export default function Documentos() {
         subtitulo="Tus exámenes reales (PDF o foto), listos para mostrar al médico"
       />
 
+      {esDueno && (
       <Tarjeta className="p-4">
           <h2 className="font-semibold text-slate-800">Subir documento</h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -119,6 +121,7 @@ export default function Documentos() {
             </p>
           )}
       </Tarjeta>
+      )}
 
       {/* lista */}
       <div className="mt-4 flex flex-col gap-2">
@@ -148,16 +151,18 @@ export default function Documentos() {
                 </p>
               </button>
               {ex && <Etiqueta color="sky">🔗</Etiqueta>}
-              <button
-                onClick={() => {
-                  if (confirm(`¿Borrar "${d.nombre}"?`))
-                    acciones.borrarDocumento(d.id)
-                }}
-                className="text-sm text-red-400"
-                title="Borrar"
-              >
-                ✕
-              </button>
+              {esDueno && (
+                <button
+                  onClick={() => {
+                    if (confirm(`¿Borrar "${d.nombre}"?`))
+                      acciones.borrarDocumento(d.id)
+                  }}
+                  className="text-sm text-red-400"
+                  title="Borrar"
+                >
+                  ✕
+                </button>
+              )}
             </Tarjeta>
           )
         })}

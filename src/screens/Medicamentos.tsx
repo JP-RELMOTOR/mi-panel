@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { acciones, useApp } from '../store'
+import { acciones, useApp, useAuth } from '../store'
 import { Boton, Encabezado, Etiqueta, Tarjeta } from '../ui'
 import { esDelMesActual } from '../lib/fechas'
 import type { Medicamento } from '../types'
 
 export default function Medicamentos() {
   const s = useApp()
+  const { esDueno } = useAuth()
   const [editando, setEditando] = useState<Medicamento | null>(null)
   const [nuevo, setNuevo] = useState(false)
 
@@ -19,9 +20,14 @@ export default function Medicamentos() {
         titulo="Medicamentos"
         subtitulo="Qué tomas, cuánto y cómo"
         derecha={
-          <Boton onClick={() => setNuevo(true)} className="!px-3 !py-1.5 text-sm">
-            + Agregar
-          </Boton>
+          esDueno ? (
+            <Boton
+              onClick={() => setNuevo(true)}
+              className="!px-3 !py-1.5 text-sm"
+            >
+              + Agregar
+            </Boton>
+          ) : undefined
         }
       />
 
@@ -62,12 +68,14 @@ export default function Medicamentos() {
                     <p className="mt-1.5 text-xs text-slate-500">{m.notas}</p>
                   )}
                 </div>
-                <button
-                  onClick={() => setEditando(m)}
-                  className="text-sm text-sky-700"
-                >
-                  Editar
-                </button>
+                {esDueno && (
+                  <button
+                    onClick={() => setEditando(m)}
+                    className="text-sm text-sky-700"
+                  >
+                    Editar
+                  </button>
+                )}
               </div>
             </Tarjeta>
           )

@@ -55,6 +55,7 @@ interface AuthState {
   authListo: boolean
   sinAcceso: boolean
   nubeLista: boolean
+  esDueno: boolean // true: puede escribir y usar el asistente. false: invitado (solo lectura)
 }
 
 let authState: AuthState = {
@@ -62,6 +63,19 @@ let authState: AuthState = {
   authListo: !hayNube(), // en modo local no hay login
   sinAcceso: false,
   nubeLista: !hayNube(),
+  esDueno: !hayNube(), // en modo local siempre eres el dueño
+}
+
+// ¿La cuenta actual es la dueña del panel? (única que escribe / usa el agente)
+function esDuenoActual(): boolean {
+  if (!hayNube()) return true
+  const dueno = estado.config.duenoUid
+  return !!authState.usuario && !!dueno && authState.usuario.uid === dueno
+}
+
+function recomputarDueno() {
+  const nuevo = esDuenoActual()
+  if (nuevo !== authState.esDueno) authState = { ...authState, esDueno: nuevo }
 }
 
 function notify() {
@@ -109,6 +123,8 @@ function guardarLocal(s: AppState) {
 }
 
 function setLocal(actualizar: (s: AppState) => AppState) {
+  // Invitado (no dueño) en modo nube: solo lectura, ninguna edición local
+  if (hayNube() && !esDuenoActual()) return
   estado = actualizar(estado)
   guardarLocal(estado)
   notify()
@@ -122,14 +138,14 @@ function limpio<T>(v: T): T {
 }
 
 function cloudSet(path: string, val: unknown) {
-  if (!hayNube() || !db || !authState.usuario) return
+  if (!hayNube() || !db || !authState.usuario || !esDuenoActual()) return
   set(ref(db, `${RAIZ}/${path}`), limpio(val)).catch((e) =>
     console.warn('cloudSet:', path, e),
   )
 }
 
 function cloudRemove(path: string) {
-  if (!hayNube() || !db || !authState.usuario) return
+  if (!hayNube() || !db || !authState.usuario || !esDuenoActual()) return
   remove(ref(db, `${RAIZ}/${path}`)).catch((e) =>
     console.warn('cloudRemove:', path, e),
   )
@@ -159,6 +175,8 @@ function cloudAEstado(val: Record<string, unknown> | null): AppState {
 }
 
 let unsubData: Unsubscribe | null = null
+let unsubSecretos: Unsubscribe | null = null
+let secretoApiKey: string | undefined // API key del dueño (bóveda `secretos`)
 let archivosSincronizados = false
 
 // Documentos guardados sin nube (pendientes en IndexedDB) → subirlos al
@@ -187,9 +205,12 @@ function conectarDatos() {
     ref(db, RAIZ),
     (snap) => {
       estado = cloudAEstado(snap.val())
+      // La API key vive en la bóveda `secretos` (no en salud): re-inyectarla
+      if (secretoApiKey) estado.config.apiKey = secretoApiKey
       guardarLocal(estado)
+      recomputarDueno()
       setAuthState({ nubeLista: true, sinAcceso: false })
-      if (!archivosSincronizados) {
+      if (esDuenoActual() && !archivosSincronizados) {
         archivosSincronizados = true
         sincronizarArchivosPendientes()
       }
@@ -200,11 +221,27 @@ function conectarDatos() {
       setAuthState({ nubeLista: true, sinAcceso: true })
     },
   )
+  // Bóveda de secretos: solo el dueño puede leerla (los invitados dan error,
+  // que ignoramos — simplemente no tendrán API key ni asistente).
+  unsubSecretos = onValue(
+    ref(db, 'secretos'),
+    (snap) => {
+      secretoApiKey = (snap.val() as { apiKey?: string } | null)?.apiKey
+      estado = { ...estado, config: { ...estado.config, apiKey: secretoApiKey } }
+      notify()
+    },
+    () => {
+      /* invitado sin permiso: sin API key */
+    },
+  )
 }
 
 function desconectarDatos() {
   unsubData?.()
   unsubData = null
+  unsubSecretos?.()
+  unsubSecretos = null
+  secretoApiKey = undefined
   archivosSincronizados = false
   try {
     localStorage.removeItem(STORAGE_KEY)
@@ -212,7 +249,7 @@ function desconectarDatos() {
     /* ignorar */
   }
   estado = estadoVacio()
-  setAuthState({ nubeLista: false, sinAcceso: false })
+  setAuthState({ nubeLista: false, sinAcceso: false, esDueno: false })
 }
 
 // Arranque de auth (solo con nube configurada)
@@ -221,6 +258,7 @@ if (hayNube() && auth) {
   onAuthStateChanged(auth, (u) => {
     if (u) {
       setAuthState({ usuario: u, authListo: true })
+      recomputarDueno()
       conectarDatos()
     } else {
       desconectarDatos()
@@ -418,7 +456,13 @@ export const acciones = {
 
   setApiKey(apiKey: string) {
     setLocal((s) => ({ ...s, config: { ...s.config, apiKey } }))
-    cloudSet(`config/apiKey`, apiKey)
+    // La API key va a la bóveda `secretos` (solo el dueño la lee/escribe)
+    if (hayNube() && db && esDuenoActual()) {
+      secretoApiKey = apiKey
+      set(ref(db, 'secretos/apiKey'), apiKey).catch((e) =>
+        console.warn('setApiKey:', e),
+      )
+    }
   },
 
   setModelo(modelo: string) {

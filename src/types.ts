@@ -146,8 +146,9 @@ export interface Perfil {
 export interface ConfigApp {
   esquemaVersion?: number
   ultimaImportacion?: string
-  apiKey?: string
+  apiKey?: string // se carga desde la bóveda `secretos` (solo el dueño)
   modelo?: string // modelo del Asistente (ver MODELOS en lib/claude.ts)
+  duenoUid?: string // UID de la cuenta dueña (única que puede escribir)
 }
 
 // ============ Estado global de la app ============

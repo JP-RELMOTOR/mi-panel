@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { acciones, useApp } from '../store'
+import { acciones, useApp, useAuth } from '../store'
 import { Boton, Encabezado, Tarjeta } from '../ui'
 import { hayNube } from '../firebase'
 import { MODELO_DEFECTO, MODELOS } from '../lib/claude'
 
 export default function Ajustes() {
   const s = useApp()
+  const { esDueno } = useAuth()
   const [key, setKey] = useState('')
   const [guardado, setGuardado] = useState(false)
 
@@ -23,6 +24,7 @@ export default function Ajustes() {
     <div className="p-4 pb-24">
       <Encabezado titulo="Ajustes" />
 
+      {esDueno && (
       <Tarjeta className="p-4">
         <h2 className="font-semibold text-slate-800">🤖 Asistente IA</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -95,6 +97,7 @@ export default function Ajustes() {
           </p>
         </div>
       </Tarjeta>
+      )}
 
       <Tarjeta className="mt-4 p-4">
         <h2 className="font-semibold text-slate-800">☁️ Conexión</h2>

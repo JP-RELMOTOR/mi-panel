@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { acciones, useApp } from '../store'
+import { acciones, useApp, useAuth } from '../store'
 import { Encabezado, Etiqueta, Tarjeta } from '../ui'
 import { NOTA_CONFIRMAR } from '../config'
 import type { Tamizaje } from '../types'
@@ -9,6 +9,7 @@ const PESO_ESTADO = { pendiente: 0, agendado: 1, hecho: 2 }
 
 export default function Prevencion() {
   const s = useApp()
+  const { esDueno } = useAuth()
 
   const tamizajes = useMemo(
     () =>
@@ -40,7 +41,7 @@ export default function Prevencion() {
       />
       <div className="flex flex-col gap-3">
         {tamizajes.map((t) => (
-          <FilaTamizaje key={t.id} t={t} />
+          <FilaTamizaje key={t.id} t={t} esDueno={esDueno} />
         ))}
       </div>
       <p className="mt-5 text-center text-xs text-slate-400">
@@ -50,7 +51,7 @@ export default function Prevencion() {
   )
 }
 
-function FilaTamizaje({ t }: { t: Tamizaje }) {
+function FilaTamizaje({ t, esDueno }: { t: Tamizaje; esDueno: boolean }) {
   const chipEstado = {
     pendiente: { label: 'Pendiente', cls: 'bg-red-50 text-red-700 border-red-200' },
     agendado: { label: 'Agendado', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
@@ -83,24 +84,30 @@ function FilaTamizaje({ t }: { t: Tamizaje }) {
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
-          onClick={() => acciones.cicloEstadoTamizaje(t.id)}
-          className={`rounded-full border px-3 py-1 text-sm font-medium ${chipEstado.cls}`}
-          title="Tocar para cambiar estado"
+          onClick={() => esDueno && acciones.cicloEstadoTamizaje(t.id)}
+          disabled={!esDueno}
+          className={`rounded-full border px-3 py-1 text-sm font-medium ${chipEstado.cls} ${
+            esDueno ? '' : 'cursor-default opacity-90'
+          }`}
+          title={esDueno ? 'Tocar para cambiar estado' : undefined}
         >
           {chipEstado.label}
         </button>
-        <input
-          type="month"
-          value={t.fechaObjetivo?.slice(0, 7) ?? ''}
-          onChange={(e) =>
-            acciones.guardarTamizaje({
-              ...t,
-              fechaObjetivo: e.target.value || undefined,
-            })
-          }
-          className="rounded-full border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600"
-          title="Fecha objetivo"
-        />
+        {(esDueno || t.fechaObjetivo) && (
+          <input
+            type="month"
+            value={t.fechaObjetivo?.slice(0, 7) ?? ''}
+            disabled={!esDueno}
+            onChange={(e) =>
+              acciones.guardarTamizaje({
+                ...t,
+                fechaObjetivo: e.target.value || undefined,
+              })
+            }
+            className="rounded-full border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-70"
+            title="Fecha objetivo"
+          />
+        )}
       </div>
     </Tarjeta>
   )
