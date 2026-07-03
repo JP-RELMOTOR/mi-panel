@@ -8,6 +8,7 @@ import {
   PROMPT_PREDIAGNOSTICO,
 } from '../lib/claude'
 import { fechaCorta } from '../lib/fechas'
+import Markdown from '../components/Markdown'
 import type { MensajeChat } from '../types'
 
 export default function Asistente({ onIrAjustes }: { onIrAjustes: () => void }) {
@@ -290,42 +291,3 @@ function Burbuja({ m }: { m: MensajeChat }) {
   )
 }
 
-// Render minimalista de markdown (negritas, títulos, listas) sin librerías
-function Markdown({ texto }: { texto: string }) {
-  const lineas = texto.split('\n')
-  return (
-    <div className="text-sm leading-relaxed text-slate-700">
-      {lineas.map((l, i) => {
-        const conNegritas = (t: string) =>
-          t.split(/(\*\*[^*]+\*\*)/g).map((seg, j) =>
-            seg.startsWith('**') && seg.endsWith('**') ? (
-              <b key={j}>{seg.slice(2, -2)}</b>
-            ) : (
-              seg
-            ),
-          )
-        if (/^#{1,3}\s/.test(l))
-          return (
-            <p key={i} className="mt-2 font-bold text-slate-800">
-              {conNegritas(l.replace(/^#{1,3}\s/, ''))}
-            </p>
-          )
-        if (/^\s*[-•*]\s/.test(l))
-          return (
-            <p key={i} className="ml-3 flex gap-1.5">
-              <span>•</span>
-              <span>{conNegritas(l.replace(/^\s*[-•*]\s/, ''))}</span>
-            </p>
-          )
-        if (/^\s*\d+\.\s/.test(l))
-          return (
-            <p key={i} className="ml-3">
-              {conNegritas(l)}
-            </p>
-          )
-        if (l.trim() === '') return <div key={i} className="h-2" />
-        return <p key={i}>{conNegritas(l)}</p>
-      })}
-    </div>
-  )
-}

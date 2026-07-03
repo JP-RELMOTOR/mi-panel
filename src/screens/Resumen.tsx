@@ -1,30 +1,22 @@
-import { useMemo } from 'react'
-import { useApp } from '../store'
-import { Encabezado, Etiqueta, Tarjeta } from '../ui'
+import { useMemo, useState } from 'react'
+import { acciones, useApp } from '../store'
+import { Encabezado, Tarjeta } from '../ui'
+import Markdown from '../components/Markdown'
 import { fechaCorta, lunesDeEstaSemana } from '../lib/fechas'
-import { fmt, hallazgos, patrones } from '../lib/rangos'
-import { META_CARDIO_MIN, META_FUERZA_SESIONES, NOTA_CONFIRMAR } from '../config'
+import { fmt, hallazgos } from '../lib/rangos'
+import { armarContexto, errorLegible, generarInforme } from '../lib/claude'
+import { META_CARDIO_MIN, META_FUERZA_SESIONES } from '../config'
 
 export default function Resumen({
   onIr,
 }: {
-  onIr: (p: 'examenes' | 'prevencion' | 'diario') => void
+  onIr: (p: 'examenes' | 'prevencion' | 'diario' | 'ajustes') => void
 }) {
   const s = useApp()
+  const [regenerando, setRegenerando] = useState(false)
+  const [error, setError] = useState('')
 
   const lista = useMemo(() => hallazgos(s), [s])
-  const lecturas = useMemo(() => patrones(s), [s])
-  const destacados = useMemo(
-    () => Object.values(s.eventos).filter((e) => e.destacado),
-    [s.eventos],
-  )
-  const tamizajesUrgentes = useMemo(
-    () =>
-      Object.values(s.tamizajes)
-        .filter((t) => t.estado !== 'hecho' && t.prioridad === 'alta')
-        .sort((a, b) => a.orden - b.orden),
-    [s.tamizajes],
-  )
   const semana = useMemo(() => {
     const lunes = lunesDeEstaSemana()
     let cardio = 0
@@ -39,6 +31,22 @@ export default function Resumen({
   }, [s.habitos])
 
   const vacio = Object.keys(s.examenes).length === 0
+  const informe = s.informe
+
+  async function regenerar() {
+    if (!s.config.apiKey || regenerando) return
+    setError('')
+    setRegenerando(true)
+    try {
+      const nuevo = await generarInforme(s.config.apiKey, armarContexto(s))
+      acciones.guardarInforme(nuevo)
+    } catch (e) {
+      console.warn(e)
+      setError(errorLegible(e))
+    } finally {
+      setRegenerando(false)
+    }
+  }
 
   if (vacio) {
     return (
@@ -63,138 +71,168 @@ export default function Resumen({
     <div className="p-4 pb-24">
       <Encabezado titulo="Resumen" subtitulo="Tu salud, en un solo lugar" />
 
-      {/* eventos destacados (ej. hipoacusia) */}
-      {destacados.map((e) => (
-        <Tarjeta key={e.id} className="mb-3 border-amber-200 bg-amber-50/60 p-4">
-          <div className="flex items-start gap-3">
-            <span className="text-xl">📌</span>
-            <div>
-              <p className="font-semibold text-slate-800">{e.titulo}</p>
-              <p className="text-xs text-slate-500">
-                {e.fecha ? fechaCorta(e.fecha) : e.fechaTexto}
-              </p>
-              {e.descripcion && (
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
-                  {e.descripcion}
-                </p>
-              )}
-            </div>
+      {/* ===== informe de cabecera: la opinión ===== */}
+      {informe ? (
+        <Tarjeta className="border-sky-100 p-4 ring-1 ring-sky-50">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-bold text-slate-800">
+              👨‍⚕️ Cómo veo tu salud
+            </h2>
+            <span className="shrink-0 text-[11px] text-slate-400">
+              {fechaCorta(informe.fecha.slice(0, 10))}
+              {informe.origen === 'asistente' ? ' · IA' : ''}
+            </span>
           </div>
+          <div className="mt-2">
+            <Markdown texto={informe.opinion} />
+          </div>
+          {s.config.apiKey && (
+            <button
+              onClick={regenerar}
+              disabled={regenerando}
+              className="mt-3 w-full rounded-xl bg-slate-50 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {regenerando
+                ? 'Actualizando con el Asistente…'
+                : '✨ Actualizar con el Asistente (usa tus datos al día)'}
+            </button>
+          )}
+          {error && (
+            <p className="mt-2 rounded-xl bg-red-50 p-2.5 text-sm text-red-700">
+              {error}
+            </p>
+          )}
         </Tarjeta>
-      ))}
+      ) : (
+        <Tarjeta className="p-4">
+          <p className="text-sm text-slate-600">
+            👨‍⚕️ Tu informe de cabecera aún no está cargado — re-importa la
+            semilla actualizada (menú → Importar) o genera uno con el
+            Asistente.
+          </p>
+        </Tarjeta>
+      )}
 
-      {/* tamizajes de prioridad alta */}
-      {tamizajesUrgentes.length > 0 && (
-        <Tarjeta
-          className="mb-3 cursor-pointer border-red-200 p-4"
+      {/* ===== los cambios, en orden de impacto ===== */}
+      {informe && informe.acciones.length > 0 && (
+        <div className="mt-5">
+          <h2 className="mb-2 px-1 text-base font-bold text-slate-800">
+            Los cambios, en orden de impacto
+          </h2>
+          <div className="flex flex-col gap-2.5">
+            {(() => {
+              let n = 0
+              return informe.acciones.map((a, i) => {
+                const urgente = a.urgencia === 'alta'
+                if (!urgente) n++
+                return (
+                  <Tarjeta
+                    key={i}
+                    className={`flex gap-3 p-4 ${
+                      urgente ? 'border-red-100 ring-1 ring-red-50' : ''
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-bold text-white ${
+                        urgente ? 'bg-red-600' : 'bg-sky-800'
+                      }`}
+                    >
+                      {urgente ? '!' : n}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-slate-800">
+                        {a.titulo}
+                      </h3>
+                      <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                        {a.detalle}
+                      </p>
+                      <p className="mt-1.5 text-sm font-medium text-sky-800">
+                        Por qué: {a.porque}
+                      </p>
+                    </div>
+                  </Tarjeta>
+                )
+              })
+            })()}
+          </div>
+        </div>
+      )}
 
-        >
-          <button className="w-full text-left" onClick={() => onIr('prevencion')}>
+      {/* ===== secundario: estado actual compacto ===== */}
+      <div className="mt-5">
+        <Tarjeta className="p-4">
+          <button className="w-full text-left" onClick={() => onIr('examenes')}>
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-slate-800">
-                🎯 Prevención — no dejar pasar
+                🧪 Valores a la vista
               </h2>
               <span className="text-slate-400">→</span>
             </div>
-            {tamizajesUrgentes.map((t) => (
-              <p key={t.id} className="mt-1.5 text-sm text-slate-600">
-                <Etiqueta color="red">{t.estado}</Etiqueta>{' '}
-                <span className="ml-1">{t.nombre}</span>
-              </p>
-            ))}
+          </button>
+          {lista.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">
+              Todo dentro de rango y sin cambios grandes. 💚
+            </p>
+          ) : (
+            <div className="mt-1 divide-y divide-slate-100">
+              {lista.slice(0, 5).map((hz) => (
+                <div
+                  key={hz.analitoId}
+                  className="flex items-baseline justify-between gap-2 py-2"
+                >
+                  <span className="text-sm text-slate-700">{hz.nombre}</span>
+                  <span className="flex items-baseline gap-2 font-mono text-sm">
+                    <span
+                      className={`font-semibold ${
+                        hz.estado === 'out'
+                          ? 'text-red-600'
+                          : hz.estado === 'watch'
+                            ? 'text-amber-700'
+                            : 'text-slate-800'
+                      }`}
+                    >
+                      {hz.ultimo.valor != null
+                        ? fmt(hz.ultimo.valor)
+                        : hz.ultimo.texto}
+                      {hz.unidad && hz.ultimo.valor != null && (
+                        <span className="ml-1 text-xs font-normal text-slate-400">
+                          {hz.unidad}
+                        </span>
+                      )}
+                    </span>
+                    {hz.deltaPct != null && (
+                      <span
+                        className={`text-xs ${
+                          hz.deltaPct > 0 ? 'text-orange-600' : 'text-sky-600'
+                        }`}
+                      >
+                        {hz.deltaPct > 0 ? '▲' : '▼'}
+                        {Math.abs(Math.round(hz.deltaPct))}%
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Tarjeta>
+
+        <Tarjeta className="mt-3 p-4">
+          <button className="w-full text-left" onClick={() => onIr('diario')}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-slate-800">🌿 Esta semana</h2>
+              <span className="text-slate-400">→</span>
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              {semana.cardio} / {META_CARDIO_MIN} min de cardio ·{' '}
+              {semana.fuerza} / {META_FUERZA_SESIONES} de fuerza
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Constancia, no perfección.
+            </p>
           </button>
         </Tarjeta>
-      )}
-
-      {/* tarjeta Lectura: patrones por reglas */}
-      {lecturas.length > 0 && (
-        <Tarjeta className="mb-3 p-4">
-          <h2 className="font-semibold text-slate-800">🔎 Lectura</h2>
-          {lecturas.map((p, i) => (
-            <div key={i} className="mt-2">
-              <p className="text-sm font-medium text-slate-700">{p.titulo}</p>
-              <p className="text-sm leading-relaxed text-slate-600">
-                {p.detalle}
-              </p>
-            </div>
-          ))}
-          <p className="mt-3 text-xs text-slate-400">{NOTA_CONFIRMAR}</p>
-        </Tarjeta>
-      )}
-
-      {/* hallazgos */}
-      <Tarjeta className="mb-3 p-4">
-        <button className="w-full text-left" onClick={() => onIr('examenes')}>
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800">
-              🧪 Hallazgos del último control
-            </h2>
-            <span className="text-slate-400">→</span>
-          </div>
-        </button>
-        {lista.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">
-            Todo dentro de rango y sin cambios grandes. 💚
-          </p>
-        )}
-        <div className="mt-1 divide-y divide-slate-100">
-          {lista.slice(0, 6).map((hz) => (
-            <div
-              key={hz.analitoId}
-              className="flex items-baseline justify-between gap-2 py-2"
-            >
-              <span className="text-sm text-slate-700">{hz.nombre}</span>
-              <span className="flex items-baseline gap-2 font-mono text-sm">
-                <span
-                  className={`font-semibold ${
-                    hz.estado === 'out'
-                      ? 'text-red-600'
-                      : hz.estado === 'watch'
-                        ? 'text-amber-700'
-                        : 'text-slate-800'
-                  }`}
-                >
-                  {hz.ultimo.valor != null
-                    ? fmt(hz.ultimo.valor)
-                    : hz.ultimo.texto}
-                  {hz.unidad && (
-                    <span className="ml-1 text-xs font-normal text-slate-400">
-                      {hz.unidad}
-                    </span>
-                  )}
-                </span>
-                {hz.deltaPct != null && (
-                  <span
-                    className={`text-xs ${
-                      hz.deltaPct > 0 ? 'text-orange-600' : 'text-sky-600'
-                    }`}
-                  >
-                    {hz.deltaPct > 0 ? '▲' : '▼'}
-                    {Math.abs(Math.round(hz.deltaPct))}%
-                  </span>
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Tarjeta>
-
-      {/* racha de hábitos */}
-      <Tarjeta className="p-4">
-        <button className="w-full text-left" onClick={() => onIr('diario')}>
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800">🌿 Esta semana</h2>
-            <span className="text-slate-400">→</span>
-          </div>
-          <p className="mt-2 text-sm text-slate-600">
-            {semana.cardio} / {META_CARDIO_MIN} min de cardio ·{' '}
-            {semana.fuerza} / {META_FUERZA_SESIONES} de fuerza
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Constancia, no perfección.
-          </p>
-        </button>
-      </Tarjeta>
+      </div>
     </div>
   )
 }

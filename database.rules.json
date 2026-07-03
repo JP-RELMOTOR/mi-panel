@@ -18,6 +18,7 @@
       "consultas": { "$id": { ".validate": "newData.hasChildren(['id','fecha'])" } },
       "lecturas": { "$id": { ".validate": "newData.hasChildren(['id','fecha'])" } },
       "documentos": { "$id": { ".validate": "newData.hasChildren(['id','nombre'])" } },
+      "informe": { ".validate": true },
       "config": { ".validate": true },
       "$otro": { ".validate": false }
     },

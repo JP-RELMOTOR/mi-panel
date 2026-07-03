@@ -31,6 +31,7 @@ import {
   type Consulta,
   type Documento,
   type HabitoDia,
+  type Informe,
   type Lectura,
   type Medicamento,
   type Tamizaje,
@@ -146,6 +147,7 @@ function cloudAEstado(val: Record<string, unknown> | null): AppState {
     consultas: v['consultas'] ?? {},
     lecturas: v['lecturas'] ?? {},
     documentos: v['documentos'] ?? {},
+    informe: v['informe'] ?? null,
     config: v['config'] ?? {},
   }
 }
@@ -358,6 +360,11 @@ export const acciones = {
     }
   },
 
+  guardarInforme(informe: Informe) {
+    setLocal((s) => ({ ...s, informe }))
+    cloudSet('informe', informe)
+  },
+
   setApiKey(apiKey: string) {
     setLocal((s) => ({ ...s, config: { ...s.config, apiKey } }))
     cloudSet(`config/apiKey`, apiKey)
@@ -402,34 +409,41 @@ export const acciones = {
       }))
     }
 
-    // resultados: matriz analito → examen (dos niveles)
-    const resultados = json['resultados'] as
-      | Record<string, Record<string, unknown>>
-      | undefined
-    if (resultados && typeof resultados === 'object') {
+    // matrices de dos niveles: resultados (analito→examen) y tomas (med→fecha)
+    for (const col of ['resultados', 'tomas'] as const) {
+      const matriz = json[col] as
+        | Record<string, Record<string, unknown>>
+        | undefined
+      if (!matriz || typeof matriz !== 'object') continue
       let n = 0
-      for (const [aid, porExamen] of Object.entries(resultados)) {
-        for (const [eid, r] of Object.entries(porExamen)) {
-          rutas[`resultados/${aid}/${eid}`] = limpio(r)
+      for (const [k1, porK2] of Object.entries(matriz)) {
+        for (const [k2, r] of Object.entries(porK2)) {
+          rutas[`${col}/${k1}/${k2}`] = limpio(r)
           n++
         }
       }
-      resumen.push(`${n} resultados`)
+      resumen.push(`${n} ${col}`)
       setLocal((s) => {
-        const merged = { ...s.resultados }
-        for (const [aid, porExamen] of Object.entries(resultados)) {
-          merged[aid] = { ...(merged[aid] ?? {}), ...limpio(porExamen) } as never
+        const merged = { ...(s[col] as Record<string, Record<string, unknown>>) }
+        for (const [k1, porK2] of Object.entries(matriz)) {
+          merged[k1] = { ...(merged[k1] ?? {}), ...limpio(porK2) }
         }
-        return { ...s, resultados: merged }
+        return { ...s, [col]: merged }
       })
     }
 
-    // perfil y hábitos (merge simple)
+    // perfil, informe y hábitos (merge simple / reemplazo)
     const perfil = json['perfil'] as Record<string, unknown> | undefined
     if (perfil && typeof perfil === 'object') {
       rutas[`perfil`] = limpio(perfil)
       resumen.push('perfil')
       setLocal((s) => ({ ...s, perfil: { ...s.perfil, ...limpio(perfil) } }))
+    }
+    const informe = json['informe'] as Informe | undefined
+    if (informe && typeof informe === 'object') {
+      rutas[`informe`] = limpio(informe)
+      resumen.push('informe de cabecera')
+      setLocal((s) => ({ ...s, informe: limpio(informe) }))
     }
     const habitos = json['habitos'] as Record<string, unknown> | undefined
     if (habitos && typeof habitos === 'object') {
@@ -443,6 +457,16 @@ export const acciones = {
           ...s.habitos,
           ...(limpio(habitos) as AppState['habitos']),
         },
+      }))
+    }
+
+    // config: conservar la API key si viene en un respaldo
+    const config = json['config'] as { apiKey?: string } | undefined
+    if (config?.apiKey) {
+      rutas[`config/apiKey`] = config.apiKey
+      setLocal((s) => ({
+        ...s,
+        config: { ...s.config, apiKey: config.apiKey },
       }))
     }
 

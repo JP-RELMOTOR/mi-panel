@@ -1,7 +1,7 @@
 // Cliente del Asistente IA — llamadas directas navegador → API de Anthropic.
 // La API key vive en salud/config (base protegida por UID), nunca en el código.
 import Anthropic from '@anthropic-ai/sdk'
-import type { AppState, MensajeChat } from '../types'
+import type { AccionInforme, AppState, Informe, MensajeChat } from '../types'
 import { serieDeAnalito } from './rangos'
 import { esDelMesActual, hoyISO, ultimosDias } from './fechas'
 
@@ -142,6 +142,84 @@ export async function consultar(
     onTexto(acumulado)
   }
   return acumulado
+}
+
+// ---------- Informe de cabecera (opinión + plan de acción del Resumen) ----------
+
+const SCHEMA_INFORME = {
+  type: 'object',
+  properties: {
+    opinion: {
+      type: 'string',
+      description:
+        'Opinión narrativa en markdown (negritas con **): la historia que cuentan TODOS los años de exámenes juntos, cómo está hoy, y los 2-3 puntos que más te llaman la atención o preocupan. Tono de médico de cabecera cercano y franco, sin alarmismo. Cierra con una línea en cursiva recordando confirmarlo con su médico.',
+    },
+    acciones: {
+      type: 'array',
+      description:
+        'Los cambios en orden de impacto (4 a 7). urgencia "alta" SOLO para lo tiempo-sensible.',
+      items: {
+        type: 'object',
+        properties: {
+          titulo: { type: 'string' },
+          detalle: {
+            type: 'string',
+            description: 'Qué hacer y cómo, concreto y realizable.',
+          },
+          porque: {
+            type: 'string',
+            description: 'El mecanismo o razón, en una frase.',
+          },
+          urgencia: { type: 'string', enum: ['alta', 'normal'] },
+        },
+        required: ['titulo', 'detalle', 'porque', 'urgencia'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['opinion', 'acciones'],
+  additionalProperties: false,
+} as const
+
+const PROMPT_INFORME = `Genera mi INFORME DE CABECERA para la pantalla principal de la app, usando todos mis datos. Es tu opinión como mi médico de cabecera: qué historia cuentan mis años de exámenes en conjunto, cómo estoy hoy puntualmente, qué te preocupa o te llama la atención (con los valores y velocidades concretas), y luego el plan: los cambios en orden de impacto, cada uno con qué hacer, cómo y por qué. Prioriza hábitos (alimentación, movimiento, sueño) por sobre listas de exámenes pendientes — eso vive en otra pestaña. Sé franco pero no alarmista.`
+
+export async function generarInforme(
+  apiKey: string,
+  contexto: string,
+): Promise<Informe> {
+  const c = cliente(apiKey)
+  const res = await c.messages.create({
+    model: MODELO,
+    max_tokens: 8192,
+    thinking: { type: 'adaptive' },
+    system: [
+      { type: 'text', text: INSTRUCCIONES },
+      {
+        type: 'text',
+        text: `DATOS DE SALUD (JSON):\n${contexto}`,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    output_config: {
+      format: { type: 'json_schema', schema: SCHEMA_INFORME },
+    },
+    messages: [{ role: 'user', content: PROMPT_INFORME }],
+  })
+  if (res.stop_reason === 'refusal') {
+    throw new Error('La generación fue rechazada por seguridad. Reintenta.')
+  }
+  const texto = res.content.find((b) => b.type === 'text')?.text
+  if (!texto) throw new Error('Respuesta vacía del asistente.')
+  const datos = JSON.parse(texto) as {
+    opinion: string
+    acciones: AccionInforme[]
+  }
+  return {
+    fecha: new Date().toISOString(),
+    origen: 'asistente',
+    opinion: datos.opinion,
+    acciones: datos.acciones,
+  }
 }
 
 export const PROMPT_PREDIAGNOSTICO = `Genera un PREDIAGNÓSTICO ORIENTATIVO completo de mi estado de salud con todos mis datos. Estructura:

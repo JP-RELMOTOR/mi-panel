@@ -109,6 +109,23 @@ export interface Lectura {
   texto: string
 }
 
+// Informe de cabecera: la lectura principal del Resumen — opinión narrativa
+// + plan de acción en orden de impacto. Puede venir curado (semilla) o
+// regenerarse con el Asistente cuando entren exámenes nuevos.
+export interface AccionInforme {
+  titulo: string
+  detalle: string // qué hacer y cómo, concreto
+  porque: string // el mecanismo, en una frase
+  urgencia: 'alta' | 'normal'
+}
+
+export interface Informe {
+  fecha: string // ISO
+  origen: 'semilla' | 'asistente'
+  opinion: string // markdown
+  acciones: AccionInforme[]
+}
+
 // Metadatos de un documento original (PDF/foto de examen). El archivo en sí
 // (base64) vive en la rama separada `archivos/{id}` y se descarga a pedido.
 export interface Documento {
@@ -148,6 +165,7 @@ export interface AppState {
   consultas: Record<string, Consulta>
   lecturas: Record<string, Lectura>
   documentos: Record<string, Documento>
+  informe: Informe | null
   config: ConfigApp
 }
 
@@ -166,6 +184,7 @@ export function estadoVacio(): AppState {
     consultas: {},
     lecturas: {},
     documentos: {},
+    informe: null,
     config: {},
   }
 }
