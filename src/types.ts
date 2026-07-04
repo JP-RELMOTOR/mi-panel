@@ -66,8 +66,10 @@ export interface EventoSalud {
 // Una fase de una pauta (ej. carga, baja, mantención)
 export interface FaseCurso {
   etiqueta: string // "Carga", "Baja", "Mantención"
-  detalle: string // "2 comprimidos cada 12 h"
+  detalle: string // frase humana, ej. "2 comprimidos cada 12 h"
   dias: number
+  manana?: number // comprimidos en la mañana
+  noche?: number // comprimidos en la noche
 }
 
 // Pauta con calendario: fases consecutivas desde una fecha de inicio

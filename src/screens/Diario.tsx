@@ -236,19 +236,31 @@ export default function Diario() {
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-slate-800">{m.nombre}</p>
-                    <p className="text-xs text-slate-500">
-                      {est
-                        ? est.terminado
-                          ? '✓ Curso terminado'
-                          : est.porEmpezar
-                            ? `Empieza el ${fechaCorta(m.curso!.inicio)}`
-                            : `Día ${est.diaN}/${est.totalDias} · ${est.faseHoy?.detalle}`
-                        : m.modo === 'ocasional'
-                          ? `${m.dosis} · ocasional · ${tomasMes} ${
-                              tomasMes === 1 ? 'vez' : 'veces'
-                            } este mes`
-                          : `${m.dosis}${m.horario ? ` · ${m.horario}` : ''}`}
-                    </p>
+                    {est && !fueraDeCurso && est.faseHoy ? (
+                      <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
+                          ☀️ {est.faseHoy.manana ?? 0}
+                        </span>
+                        {(est.faseHoy.noche ?? 0) > 0 && (
+                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-medium text-indigo-800">
+                            🌙 {est.faseHoy.noche}
+                          </span>
+                        )}
+                        <span>· día {est.diaN}/{est.totalDias}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500">
+                        {est
+                          ? est.terminado
+                            ? '✓ Curso terminado'
+                            : `Empieza el ${fechaCorta(m.curso!.inicio)}`
+                          : m.modo === 'ocasional'
+                            ? `${m.dosis} · ocasional · ${tomasMes} ${
+                                tomasMes === 1 ? 'vez' : 'veces'
+                              } este mes`
+                            : `${m.dosis}${m.horario ? ` · ${m.horario}` : ''}`}
+                      </p>
+                    )}
                   </div>
                   {!fueraDeCurso && (
                     <button

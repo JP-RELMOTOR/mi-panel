@@ -3,7 +3,7 @@ import { acciones, useApp, useAuth } from '../store'
 import { Boton, Encabezado, Etiqueta, Tarjeta } from '../ui'
 import { esDelMesActual, fechaCorta } from '../lib/fechas'
 import { estadoCurso, fasesConFechas } from '../lib/curso'
-import type { CursoMed, Medicamento } from '../types'
+import type { CursoMed, FaseCurso, Medicamento } from '../types'
 
 export default function Medicamentos() {
   const s = useApp()
@@ -99,46 +99,86 @@ export default function Medicamentos() {
   )
 }
 
+// Píldoras "☀️ mañana: N · 🌙 noche: M"
+function MananaNoche({ f }: { f: FaseCurso }) {
+  const tieneDetalle = f.manana != null || f.noche != null
+  if (!tieneDetalle) return <span className="font-semibold">{f.detalle}</span>
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+        ☀️ Mañana: {f.manana ?? 0}
+      </span>
+      {(f.noche ?? 0) > 0 ? (
+        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
+          🌙 Noche: {f.noche}
+        </span>
+      ) : (
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+          🌙 Noche: —
+        </span>
+      )}
+    </span>
+  )
+}
+
 function PautaCurso({ curso }: { curso: CursoMed }) {
   const est = estadoCurso(curso)
   const fases = fasesConFechas(curso)
 
   return (
     <div className="mt-2">
-      {/* estado de hoy */}
+      {/* box de HOY */}
       {est.terminado ? (
-        <p className="rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
-          ✓ Curso terminado (último día: {fechaCorta(est.finISO)})
-        </p>
+        <div className="rounded-xl bg-green-50 px-3 py-2.5 text-sm font-medium text-green-700">
+          ✓ Curso terminado — último día fue el {fechaCorta(est.finISO)}
+        </div>
       ) : est.porEmpezar ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+        <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
           Empieza el {fechaCorta(curso.inicio)}
-        </p>
+        </div>
       ) : (
-        <p className="rounded-lg bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800">
-          Hoy (día {est.diaN} de {est.totalDias}):{' '}
-          <b>{est.faseHoy?.detalle}</b>
-        </p>
+        <div className="rounded-xl bg-sky-50 px-3 py-2.5">
+          <p className="text-xs font-medium uppercase tracking-wide text-sky-600">
+            Hoy · día {est.diaN} de {est.totalDias}
+          </p>
+          {est.faseHoy && (
+            <div className="mt-1.5">
+              <MananaNoche f={est.faseHoy} />
+            </div>
+          )}
+          <p className="mt-2 text-xs text-slate-500">
+            Hasta el {fechaCorta(est.finISO)}
+          </p>
+        </div>
       )}
 
       {/* calendario de fases */}
-      <div className="mt-2 flex flex-col gap-1">
+      <div className="mt-2 flex flex-col gap-1.5">
         {fases.map((f, i) => {
           const activa = !est.terminado && !est.porEmpezar && est.faseIndex === i
           return (
             <div
               key={i}
-              className={`flex items-baseline justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs ${
-                activa ? 'bg-sky-50 font-medium text-sky-800' : 'text-slate-500'
+              className={`rounded-lg px-2.5 py-2 ${
+                activa
+                  ? 'bg-sky-50 ring-1 ring-sky-200'
+                  : est.diaN > fases.slice(0, i + 1).reduce((a, x) => a + x.dias, 0)
+                    ? 'opacity-50'
+                    : ''
               }`}
             >
-              <span>
-                {activa && '▸ '}
-                {f.etiqueta}: {f.detalle}
-              </span>
-              <span className="shrink-0 font-mono">
-                {fechaCorta(f.desde)}–{fechaCorta(f.hasta)}
-              </span>
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span className={activa ? 'font-semibold text-sky-800' : 'text-slate-600'}>
+                  {activa && '▸ '}
+                  {f.etiqueta}
+                </span>
+                <span className="shrink-0 font-mono text-slate-400">
+                  {fechaCorta(f.desde)}–{fechaCorta(f.hasta)}
+                </span>
+              </div>
+              <div className="mt-1">
+                <MananaNoche f={f} />
+              </div>
             </div>
           )
         })}
