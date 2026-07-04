@@ -63,16 +63,30 @@ export interface EventoSalud {
   orden: number
 }
 
+// Una fase de una pauta (ej. carga, baja, mantención)
+export interface FaseCurso {
+  etiqueta: string // "Carga", "Baja", "Mantención"
+  detalle: string // "2 comprimidos cada 12 h"
+  dias: number
+}
+
+// Pauta con calendario: fases consecutivas desde una fecha de inicio
+export interface CursoMed {
+  inicio: string // 'YYYY-MM-DD'
+  fases: FaseCurso[]
+}
+
 export interface Medicamento {
   id: string
   nombre: string
   dosis: string
-  modo: 'horario' | 'ocasional'
+  modo: 'horario' | 'ocasional' | 'curso'
   horario?: string
   inicio?: string
   fin?: string
   activo: boolean
   notas?: string
+  curso?: CursoMed // presente cuando modo === 'curso'
 }
 
 export interface Toma {

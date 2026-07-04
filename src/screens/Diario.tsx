@@ -9,6 +9,7 @@ import {
   ultimosDias,
 } from '../lib/fechas'
 import { META_CARDIO_MIN, META_FUERZA_SESIONES } from '../config'
+import { estadoCurso } from '../lib/curso'
 import type { HabitoDia } from '../types'
 
 export default function Diario() {
@@ -224,6 +225,10 @@ export default function Diario() {
               const tomasMes = Object.keys(s.tomas[m.id] ?? {}).filter(
                 esDelMesActual,
               ).length
+              // Para pautas: qué toca ese día (o si está fuera del curso)
+              const est = m.curso ? estadoCurso(m.curso, fecha) : null
+              const fueraDeCurso = est && (est.porEmpezar || est.terminado)
+
               return (
                 <div
                   key={m.id}
@@ -232,30 +237,35 @@ export default function Diario() {
                   <div className="min-w-0">
                     <p className="font-medium text-slate-800">{m.nombre}</p>
                     <p className="text-xs text-slate-500">
-                      {m.dosis}
-                      {m.modo === 'ocasional'
-                        ? ` · ocasional · ${tomasMes} ${
-                            tomasMes === 1 ? 'vez' : 'veces'
-                          } este mes`
-                        : m.horario
-                          ? ` · ${m.horario}`
-                          : ''}
+                      {est
+                        ? est.terminado
+                          ? '✓ Curso terminado'
+                          : est.porEmpezar
+                            ? `Empieza el ${fechaCorta(m.curso!.inicio)}`
+                            : `Día ${est.diaN}/${est.totalDias} · ${est.faseHoy?.detalle}`
+                        : m.modo === 'ocasional'
+                          ? `${m.dosis} · ocasional · ${tomasMes} ${
+                              tomasMes === 1 ? 'vez' : 'veces'
+                            } este mes`
+                          : `${m.dosis}${m.horario ? ` · ${m.horario}` : ''}`}
                     </p>
                   </div>
-                  <button
-                    onClick={() =>
-                      tomado
-                        ? acciones.quitarToma(m.id, fecha)
-                        : acciones.registrarToma(m.id, fecha)
-                    }
-                    className={`rounded-full px-4 py-1.5 text-sm font-medium ${
-                      tomado
-                        ? 'bg-green-600 text-white'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {tomado ? '✓ Tomado' : 'Registrar'}
-                  </button>
+                  {!fueraDeCurso && (
+                    <button
+                      onClick={() =>
+                        tomado
+                          ? acciones.quitarToma(m.id, fecha)
+                          : acciones.registrarToma(m.id, fecha)
+                      }
+                      className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium ${
+                        tomado
+                          ? 'bg-green-600 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {tomado ? '✓ Tomado' : 'Registrar'}
+                    </button>
+                  )}
                 </div>
               )
             })}

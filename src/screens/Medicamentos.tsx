@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { acciones, useApp, useAuth } from '../store'
 import { Boton, Encabezado, Etiqueta, Tarjeta } from '../ui'
-import { esDelMesActual } from '../lib/fechas'
-import type { Medicamento } from '../types'
+import { esDelMesActual, fechaCorta } from '../lib/fechas'
+import { estadoCurso, fasesConFechas } from '../lib/curso'
+import type { CursoMed, Medicamento } from '../types'
 
 export default function Medicamentos() {
   const s = useApp()
@@ -64,6 +65,9 @@ export default function Medicamentos() {
                       registro sin juicio, útil para conversarlo con tu médico.
                     </p>
                   )}
+                  {m.modo === 'curso' && m.curso && (
+                    <PautaCurso curso={m.curso} />
+                  )}
                   {m.notas && (
                     <p className="mt-1.5 text-xs text-slate-500">{m.notas}</p>
                   )}
@@ -95,6 +99,54 @@ export default function Medicamentos() {
   )
 }
 
+function PautaCurso({ curso }: { curso: CursoMed }) {
+  const est = estadoCurso(curso)
+  const fases = fasesConFechas(curso)
+
+  return (
+    <div className="mt-2">
+      {/* estado de hoy */}
+      {est.terminado ? (
+        <p className="rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+          ✓ Curso terminado (último día: {fechaCorta(est.finISO)})
+        </p>
+      ) : est.porEmpezar ? (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          Empieza el {fechaCorta(curso.inicio)}
+        </p>
+      ) : (
+        <p className="rounded-lg bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800">
+          Hoy (día {est.diaN} de {est.totalDias}):{' '}
+          <b>{est.faseHoy?.detalle}</b>
+        </p>
+      )}
+
+      {/* calendario de fases */}
+      <div className="mt-2 flex flex-col gap-1">
+        {fases.map((f, i) => {
+          const activa = !est.terminado && !est.porEmpezar && est.faseIndex === i
+          return (
+            <div
+              key={i}
+              className={`flex items-baseline justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs ${
+                activa ? 'bg-sky-50 font-medium text-sky-800' : 'text-slate-500'
+              }`}
+            >
+              <span>
+                {activa && '▸ '}
+                {f.etiqueta}: {f.detalle}
+              </span>
+              <span className="shrink-0 font-mono">
+                {fechaCorta(f.desde)}–{fechaCorta(f.hasta)}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function FormMedicamento({
   inicial,
   onCerrar,
@@ -105,7 +157,7 @@ function FormMedicamento({
   const [nombre, setNombre] = useState(inicial?.nombre ?? '')
   const [dosis, setDosis] = useState(inicial?.dosis ?? '')
   const [modo, setModo] = useState<'horario' | 'ocasional'>(
-    inicial?.modo ?? 'horario',
+    inicial?.modo === 'ocasional' ? 'ocasional' : 'horario',
   )
   const [horario, setHorario] = useState(inicial?.horario ?? '')
   const [notas, setNotas] = useState(inicial?.notas ?? '')
@@ -113,15 +165,19 @@ function FormMedicamento({
 
   function guardar() {
     if (!nombre.trim()) return
-    const datos = {
+    // Preservar la pauta (curso) si el medicamento la tiene — el formulario
+    // solo edita los campos simples.
+    const esCurso = inicial?.modo === 'curso'
+    const datos: Omit<Medicamento, 'id'> = {
       nombre: nombre.trim(),
       dosis: dosis.trim(),
-      modo,
+      modo: esCurso ? 'curso' : modo,
       horario: horario.trim() || undefined,
       notas: notas.trim() || undefined,
       activo,
       inicio: inicial?.inicio,
       fin: inicial?.fin,
+      curso: inicial?.curso,
     }
     if (inicial) {
       acciones.guardarMedicamento({ ...datos, id: inicial.id })
